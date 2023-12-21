@@ -256,7 +256,7 @@ private:
     }
 
     JSONValue parseString(const std::string& json) {
-        std::string value;
+        /*std::string value;
         position++;  // Skip opening quote
 
         while (json[position] != '"') {
@@ -268,8 +268,37 @@ private:
         JSONValue jsonValue;
         jsonValue.setType(JSONValueType::String);
         jsonValue.setString(value);
-        return jsonValue;
-		
+        return jsonValue;*/
+        auto pre_pos = ++position;
+        auto pos = json.find('"', position);
+        if (pos != std::string::npos)
+        {
+            //解析还没有结束，需要判断是否是转义的结束符号，如果是转义，则需要继续探查
+            while (true)
+            {
+                if (json[pos - 1] != '\\') //如果不是转义则解析结束
+                {
+                    break;
+                }
+                //如果是转义字符，则判断是否已经被抵消，已经被消耗完则跳出，否则继续寻找下个字符串结束符
+                if (esc(json,pos - 1))
+                {
+                    break;
+                }
+                pos = json.find('"', pos + 1);
+                if (pos == std::string::npos)
+                {
+                    throw std::logic_error(R"(expected left '"' in parse string)");
+                }
+            }
+            position = pos + 1;
+            JSONValue jsonValue;
+            jsonValue.setType(JSONValueType::String);
+            jsonValue.setString(json.substr(pre_pos, pos - pre_pos));
+            return jsonValue;
+        }
+        throw std::logic_error("parse string error");
+
     }
 
     JSONValue parseNumber(const std::string& json) {
@@ -358,7 +387,14 @@ private:
             position++;
         }
     }
-
+    bool esc(const std::string& json,size_t pos)
+    {
+        size_t end_pos = pos;
+        while (json[pos] == '\\') pos--;
+        auto cnt = end_pos - pos;
+        //如果 \ 的个数为偶数，则成功抵消，如果为奇数，则未抵消
+        return cnt % 2 == 0;
+    }
     size_t position;
 };
 
